@@ -1,17 +1,13 @@
-# Basketball Scrimmage Stats V4
+# Basketball Scrimmage Stats V4 — GitHub-ready
 
-Buka `index.html` di browser. Tidak perlu server atau internet.
+Semua file berada di satu folder (root). Upload **index.html**, **style.css**, dan **app.js** langsung ke root repository GitHub.
 
-## Live Stats
-- Team A di kiri, Team B di kanan. Tap nama pemain untuk memilih.
-- Panel input selalu menempel di bawah layar. Gunakan Kecilkan/Buka untuk mengubah ukurannya.
-- Tahan ikon ≡ di samping pemain, geser ke pemain lain **di tim yang sama**, lalu lepas untuk menukar posisi. Lima pemain pertama adalah pemain aktif.
-- Tombol Ganti pemain (tap) tersedia sebagai alternatif drag & drop.
-- Timer berjalan untuk 5 pemain aktif setiap tim.
-- Undo membatalkan input statistik terakhir.
+Struktur:
+- index.html
+- style.css
+- app.js
+- README.md
 
-## Data
-Data tersimpan hanya di localStorage browser. Gunakan Export Backup untuk menyimpan JSON. Data demo bawaan hanya contoh.
+GitHub Pages: Settings > Pages > Deploy from a branch > main > /(root).
 
-## Struktur
-`index.html`, `css/style.css`, `js/app.js`.
+Buka index.html untuk mencoba secara lokal. Data disimpan di localStorage browser. Backup data melalui fitur Export Backup.
