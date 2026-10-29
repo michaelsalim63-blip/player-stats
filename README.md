@@ -1,13 +1,7 @@
-# Basketball Scrimmage Stats V4 — GitHub-ready
+Basketball Scrimmage Stats V5 — file datar untuk GitHub Pages.
 
-Semua file berada di satu folder (root). Upload **index.html**, **style.css**, dan **app.js** langsung ke root repository GitHub.
+Upload index.html, style.css, app.js ke root repository.
 
-Struktur:
-- index.html
-- style.css
-- app.js
-- README.md
+Substitution HP: geser ikon ≡ dari pemain cadangan ke pemain lapangan, atau tekan tombol ⇄ Tukar pemain dengan tap, lalu ketuk dua pemain dari tim yang sama.
 
-GitHub Pages: Settings > Pages > Deploy from a branch > main > /(root).
-
-Buka index.html untuk mencoba secara lokal. Data disimpan di localStorage browser. Backup data melalui fitur Export Backup.
+Timer diperbarui tanpa menggambar ulang seluruh halaman setiap detik agar gesture drag tidak terputus. Data tersimpan di localStorage perangkat.

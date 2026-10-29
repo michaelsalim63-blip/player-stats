@@ -3,7 +3,7 @@ const KEY='basket_scrim_v2', labels={m2:'2PT ✓',x2:'2PT ✕',m3:'3PT ✓',x3:'
 const empty=()=>Object.fromEntries([...Object.keys(labels),'seconds'].map(k=>[k,0]));
 const seed=()=>({players:['Andi','Budi','Kevin','Jason','Daniel','Ricky','Steven','Evan','Ryan','Albert','David','Michael'].map((name,i)=>({id:i+1,name,number:i+1})),games:[],game:null});
 let data;try{data=JSON.parse(localStorage.getItem(KEY))||seed()}catch{data=seed()}
-let page='Dashboard',side='A',selected=null,draft={A:[],B:[]},panelMin=false,dragging=null;
+let page='Dashboard',side='A',selected=null,draft={A:[],B:[]},panelMin=false,dragging=null,subPick=null;
 const $=id=>document.getElementById(id), player=id=>data.players.find(p=>p.id===id), safe=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const save=()=>localStorage.setItem(KEY,JSON.stringify(data));
 const points=s=>s.m2*2+s.m3*3+s.mf, rebounds=s=>s.oreb+s.dreb, clock=s=>`${String(Math.floor(Math.max(0,s)/60)).padStart(2,'0')}:${String(Math.floor(Math.max(0,s)%60)).padStart(2,'0')}`;
@@ -22,25 +22,56 @@ function live(){
  const t=g.teams.A.includes(selected)?'A':'B',p=player(selected),z=g.stats[selected];
  const teamPanel=team=>{
   const order=[...g.court[team],...g.teams[team].filter(id=>!g.court[team].includes(id))];
-  return `<section class="team-panel team-${team}"><div class="team-heading"><strong>TEAM ${team}</strong><span>${score(g,team)} PTS</span></div><div class="court-caption">5 teratas = ON COURT · tahan ≡ untuk tukar pemain</div><div class="team-roster">${order.map((id,i)=>{const x=player(id),st=g.stats[id],on=i<5;return `${i===5?'<div class="bench-divider">CADANGAN</div>':''}<div class="roster-item ${on?'on':'bench'} ${selected===id?'selected':''}" data-player-id="${id}" data-team="${team}"><span class="drag-handle" data-drag-id="${id}" data-drag-team="${team}" title="Tahan lalu geser" aria-label="Geser pemain">≡</span><button class="roster-select" type="button" onclick="selectPlayer(${id})"><span class="roster-name"><b>${safe(x?.name||'Pemain')}</b><small>#${x?.number??'—'}</small></span><span class="roster-stats"><b>${points(st)}</b><small>PTS</small><b>${rebounds(st)}</b><small>REB</small><b>${st.ast}</b><small>AST</small></span></button></div>`}).join('')}</div><button class="sub-team" onclick="quickSub('${team}')">⇄ Ganti pemain (tap)</button></section>`;
+  return `<section class="team-panel team-${team}"><div class="team-heading"><strong>TEAM ${team}</strong><span>${score(g,team)} PTS</span></div><div class="court-caption">5 teratas = ON COURT · geser ≡ atau ketuk ⇄ untuk tukar pemain</div><div class="team-roster">${order.map((id,i)=>{const x=player(id),st=g.stats[id],on=i<5;return `${i===5?'<div class="bench-divider">CADANGAN</div>':''}<div class="roster-item ${on?'on':'bench'} ${selected===id?'selected':''}" data-player-id="${id}" data-team="${team}"><span class="drag-handle" data-drag-id="${id}" data-drag-team="${team}" title="Tahan lalu geser" aria-label="Geser pemain">≡</span><button class="roster-select" type="button" onclick="rosterTap(${id},'${team}')"><span class="roster-name"><b>${safe(x?.name||'Pemain')}</b><small>#${x?.number??'—'}</small></span><span class="roster-stats"><b>${points(st)}</b><small>PTS</small><b>${rebounds(st)}</b><small>REB</small><b>${st.ast}</b><small>AST</small></span></button></div>`}).join('')}</div><button class="sub-team" onclick="startTapSub('${team}')">⇄ Tukar pemain dengan tap</button></section>`;
  };
  return `<div class="live-layout"><div class="live-scorebar"><div><small>PERIODE ${g.period} / ${g.periods}</small><div class="live-score"><span>TEAM A</span> <b>${score(g,'A')} : ${score(g,'B')}</b> <span>TEAM B</span></div></div><div class="live-clock">${clock(g.remaining)}</div><div class="live-controls"><button class="primary" onclick="toggleTimer()">${g.running?'⏸ Pause':'▶ Start'}</button><button onclick="nextPeriod()">Periode +1</button><button onclick="finishGame()">Selesai</button></div></div><div class="live-columns">${teamPanel('A')}${teamPanel('B')}</div><div class="card box-score"><h3>Box Score Live</h3>${box(g,'A')}${box(g,'B')}</div></div><div class="stat-console ${panelMin?'minimized':''}" id="stat-console"><div class="stat-title"><div><small>INPUT · TEAM ${t} · #${p?.number??'—'}</small><h3>${safe(p?.name||'Pilih pemain')} <span class="muted">${points(z)} PTS · ${rebounds(z)} REB · ${z.ast} AST · ${clock(z.seconds)} MIN</span></h3></div><div class="panel-tools"><button onclick="undo()">↶ Undo</button><button onclick="panelMin=!panelMin;render()">${panelMin?'▲ Buka':'▼ Kecilkan'}</button></div></div><div class="stat-actions">${Object.entries(labels).map(([k,label])=>`<button class="${k.startsWith('m')?'good':k.startsWith('x')?'bad':''}" onclick="record('${k}')">${label}</button>`).join('')}</div></div>`;
 }
 function selectPlayer(id){selected=id;render()}
-// Pointer events work on phones, tablets and desktop; swap two roster positions.
+// Touch-friendly substitution: pointer drag and two-tap fallback.
+function startTapSub(team){subPick={team,id:null};alert('Ketuk pemain pertama, lalu ketuk pemain penggantinya pada tim yang sama.');}
+function rosterTap(id,team){
+ if(subPick){
+  if(subPick.team!==team){alert('Pilih pemain dari tim yang sama.');return;}
+  if(subPick.id===null){subPick.id=id;selected=id;render();return;}
+  const first=subPick.id;subPick=null;if(first!==id)swapRoster(team,first,id);else render();return;
+ }
+ selectPlayer(id);
+}
 function attachDrag(){
  document.querySelectorAll('.drag-handle').forEach(h=>h.addEventListener('pointerdown',e=>{
-  if(e.button!==0)return;e.preventDefault();
-  const id=+h.dataset.dragId,team=h.dataset.dragTeam;
-  dragging={id,team,handle:h};h.setPointerCapture(e.pointerId);
+  if(e.pointerType==='mouse'&&e.button!==0)return;
+  e.preventDefault();
+  dragging={id:+h.dataset.dragId,team:h.dataset.dragTeam,pointerId:e.pointerId,handle:h};
   document.body.classList.add('is-dragging');h.closest('.roster-item').classList.add('drag-source');
-  h.addEventListener('pointermove',dragMove);h.addEventListener('pointerup',dragEnd,{once:true});h.addEventListener('pointercancel',dragCancel,{once:true});
+  try{h.setPointerCapture(e.pointerId)}catch(_){}
+  h.addEventListener('pointermove',dragMove);
+  h.addEventListener('pointerup',dragEnd,{once:true});
+  h.addEventListener('pointercancel',dragCancel,{once:true});
  }));
 }
-function dragMove(e){if(!dragging)return;document.querySelectorAll('.drag-target').forEach(el=>el.classList.remove('drag-target'));const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('.roster-item');if(target&&target.dataset.team===dragging.team&&+target.dataset.playerId!==dragging.id)target.classList.add('drag-target')}
+function dragMove(e){
+ if(!dragging||e.pointerId!==dragging.pointerId)return;
+ e.preventDefault();
+ document.querySelectorAll('.drag-target').forEach(el=>el.classList.remove('drag-target'));
+ const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('.roster-item');
+ if(target&&target.dataset.team===dragging.team&&+target.dataset.playerId!==dragging.id)target.classList.add('drag-target');
+}
 function dragCancel(){dragCleanup()}
-function dragCleanup(){if(!dragging)return;dragging.handle.removeEventListener('pointermove',dragMove);document.body.classList.remove('is-dragging');document.querySelectorAll('.drag-target,.drag-source').forEach(el=>el.classList.remove('drag-target','drag-source'));dragging=null}
-function dragEnd(e){if(!dragging)return;const {id,team}=dragging;const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('.roster-item');const targetId=target&&target.dataset.team===team?+target.dataset.playerId:null;dragCleanup();if(targetId&&targetId!==id)swapRoster(team,id,targetId)}
+function dragCleanup(){
+ if(!dragging)return;
+ const h=dragging.handle;h.removeEventListener('pointermove',dragMove);
+ try{h.releasePointerCapture(dragging.pointerId)}catch(_){}
+ document.body.classList.remove('is-dragging');
+ document.querySelectorAll('.drag-target,.drag-source').forEach(el=>el.classList.remove('drag-target','drag-source'));
+ dragging=null;
+}
+function dragEnd(e){
+ if(!dragging||e.pointerId!==dragging.pointerId)return;
+ const {id,team}=dragging;
+ const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('.roster-item');
+ const targetId=target&&target.dataset.team===team?+target.dataset.playerId:null;
+ dragCleanup();if(targetId!==null&&targetId!==id)swapRoster(team,id,targetId);
+}
 function swapRoster(team,id1,id2){
  const g=data.game;if(!g)return;
  if(g.running)tick();
@@ -62,7 +93,7 @@ function quickSub(t){
  if(g.running)tick();court[court.indexOf(outId)]=inId;selected=inId;save();render();
 }
 function box(g,t){return `<h4>TEAM ${t} — ${score(g,t)} PTS</h4><div class="scroll"><table><thead><tr><th>Pemain</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th><th>PF</th><th>FG</th><th>3PT</th><th>FT</th></tr></thead><tbody>${g.teams[t].map(id=>{let p=player(id),s=g.stats[id];return `<tr><td>${safe(p?.name||'—')}</td><td>${clock(s.seconds)}</td><td>${points(s)}</td><td>${rebounds(s)}</td><td>${s.ast}</td><td>${s.stl}</td><td>${s.blk}</td><td>${s.tov}</td><td>${s.pf}</td><td>${s.m2+s.m3}/${s.m2+s.x2+s.m3+s.x3}</td><td>${s.m3}/${s.m3+s.x3}</td><td>${s.mf}/${s.mf+s.xf}</td></tr>`}).join('')}</tbody></table></div>`}
-function tick(){const g=data.game;if(!g?.running)return;let now=Date.now(),elapsed=Math.max(0,(now-g.lastTick)/1000),used=Math.min(elapsed,g.remaining);g.lastTick=now;g.remaining=Math.max(0,g.remaining-used);for(const t of ['A','B'])for(const id of g.court[t])g.stats[id].seconds+=used;if(g.remaining<=0)g.running=false;save();if(page==='Live Stats'&&!dragging)render()}
+function tick(){const g=data.game;if(!g?.running)return;let now=Date.now(),elapsed=Math.max(0,(now-g.lastTick)/1000),used=Math.min(elapsed,g.remaining);g.lastTick=now;g.remaining=Math.max(0,g.remaining-used);for(const t of ['A','B'])for(const id of g.court[t])g.stats[id].seconds+=used;if(g.remaining<=0)g.running=false;save();if(page==='Live Stats'){const el=document.querySelector('.live-clock');if(el)el.textContent=clock(g.remaining);const mins=document.querySelector('.stat-title h3 .muted');if(mins&&data.game.stats[selected]){const z=data.game.stats[selected];mins.textContent=`${points(z)} PTS · ${rebounds(z)} REB · ${z.ast} AST · ${clock(z.seconds)} MIN`;}}}
 setInterval(tick,1000);
 function toggleTimer(){const g=data.game;if(!g)return;if(g.running)tick();g.running=!g.running;g.lastTick=Date.now();save();render()}
 function nextPeriod(){const g=data.game;if(g.running)return alert('Pause timer terlebih dahulu.');if(g.period>=g.periods)return alert('Sudah periode terakhir.');g.period++;g.remaining=g.duration;save();render()}
